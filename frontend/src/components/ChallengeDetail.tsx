@@ -1,18 +1,31 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, Link } from 'react-router-dom';
 import {
   Container,
   Typography,
   Box,
   Chip,
-  Divider,
   Button,
-  TextField,
   Paper,
   Avatar,
   CircularProgress,
   Alert,
+  Card,
+  CardContent,
+  CardHeader,
+  CardActions,
+  List,
+  IconButton,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  TextField,
+  FormControl,
+  FormHelperText,
 } from '@mui/material';
+import { ChatBubbleOutline, Add, Close } from '@mui/icons-material';
+import { format } from 'date-fns';
 
 import { apiClient } from '../api/client';
 import { Challenge, Conversation, User } from '../api/openapi/types';
@@ -25,9 +38,12 @@ export const ChallengeDetail: React.FC = () => {
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [newPostContent, setNewPostContent] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [activeTab, setActiveTab] = useState<'details' | 'conversations'>('conversations');
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [topic, setTopic] = useState('');
+  const [message, setMessage] = useState('');
+  const [formErrors, setFormErrors] = useState({ topic: '', message: '' });
+
 
   const fetchData = useCallback(async () => {
     try {
@@ -63,35 +79,57 @@ export const ChallengeDetail: React.FC = () => {
       fetchUser();
     }, []);
 
-  const handleSubmitPost = async (e: React.FormEvent, conversationId: string | null = null) => {
+  const handleOpenDialog = () => {
+    setTopic('');
+    setMessage('');
+    setFormErrors({ topic: '', message: '' });
+    setIsDialogOpen(true);
+  };
+
+  const handleCloseDialog = () => {
+    setIsDialogOpen(false);
+  };
+
+  const validateForm = () => {
+    let isValid = true;
+    const newErrors = { topic: '', message: '' };
+
+    if (!topic.trim()) {
+      newErrors.topic = 'Please enter a topic';
+      isValid = false;
+    }
+
+    if (!message.trim()) {
+      newErrors.message = 'Please enter a message';
+      isValid = false;
+    }
+
+    setFormErrors(newErrors);
+    return isValid;
+  };
+
+  const handleStartNewConversation = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newPostContent.trim() || !challenge) return;
+    if (!challenge || !validateForm()) return;
 
     try {
       setIsSubmitting(true);
-
-      if (!conversationId) {
-        const newConversation = await apiClient.createConversation({
-          topic: `Discussion for ${challenge.title}`,
-          category: challenge.category,
-          challenge_id: id,
-        });
-        
-        await apiClient.createPost(newConversation.id.toString(), {
-          content: newPostContent,
-        });
-        await fetchData();
-      } else {
-        // Add to first conversation (or a selected one in a more complex UI)
-        await apiClient.createPost(conversationId, {
-          content: newPostContent,
-        });
-        await fetchData();
-      }
+      const newConversation = await apiClient.createConversation({
+        topic: topic.trim(),
+        category: challenge.category,
+        challenge_id: challenge.id,
+      });
       
-      setNewPostContent('');
+      await apiClient.createPost(newConversation.id.toString(), {
+        content: message.trim(),
+      });
+      
+      await fetchData();
+      
+      setIsDialogOpen(false);
+      navigate(`/conversations/${newConversation.id}`);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to submit post');
+      setError(err instanceof Error ? err.message : 'Failed to start new conversation');
     } finally {
       setIsSubmitting(false);
     }
@@ -181,125 +219,209 @@ export const ChallengeDetail: React.FC = () => {
       </Paper>
 
       <Box mt={4}>
-        <Box display="flex" borderBottom={1} borderColor="divider" mb={2}>
-          {/* <Button 
-            onClick={() => setActiveTab('details')}
-            sx={{
-              mr: 1,
-              borderBottom: activeTab === 'details' ? '2px solid' : 'none',
-              borderColor: 'primary.main',
-              borderRadius: 0,
-            }}
-          >
-            Challenge Details
-          </Button> */}
+        <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
+          <Typography variant="h6" component="h2">
+            Discussions ({conversations.length})
+          </Typography>
           <Button 
-            onClick={() => setActiveTab('conversations')}
-            sx={{
-              borderBottom: activeTab === 'conversations' ? '2px solid' : 'none',
-              borderColor: 'primary.main',
-              borderRadius: 0,
-            }}
+            variant="contained" 
+            color="primary" 
+            startIcon={<Add />}
+            onClick={handleOpenDialog}
+            disabled={isSubmitting}
           >
-            Discussions ({conversations.reduce((acc, conv) => acc + conv.posts.length, 0)})
+            New Discussion
           </Button>
         </Box>
 
-        {activeTab === 'conversations' && (
-          <Box mt={2}>
-            {conversations.length > 0 ? (
-              conversations.map(conversation => (
-                <Box key={conversation.id} mb={4}>
-                  <Typography variant="h6" gutterBottom>
-                    {conversation.topic}
-                    <Chip 
-                      label={conversation.status} 
-                      size="small" 
-                      sx={{ ml: 1, textTransform: 'capitalize' }}
-                      color={conversation.status === 'OPEN' ? 'success' : 'default'}
-                    />
-                  </Typography>
-                  
-                  <Paper variant="outlined" sx={{ p: 2, mb: 2 }}>
-                    {conversation.posts.map((post) => (
-                      <Box key={post.id} mb={2}>
-                        <Box display="flex" alignItems="center" mb={1}>
-                          <Avatar sx={{ width: 24, height: 24, fontSize: '0.75rem', mr: 1 }}>
-                            {post.user.charAt(0).toUpperCase()}
-                          </Avatar>
-                          <Typography variant="subtitle2" component="span">
-                            {post.user}
-                          </Typography>
-                          <Typography variant="caption" color="text.secondary" sx={{ ml: 1 }}>
-                            {new Date(post.timestamp).toLocaleString()}
-                          </Typography>
-                        </Box>
-                        <Typography variant="body2" sx={{ pl: 4 }}>{post.content}</Typography>
-                        <Divider sx={{ my: 1 }} />
+        {conversations.length === 0 ? (
+          <Paper sx={{ p: 4, textAlign: 'center' }}>
+            <ChatBubbleOutline sx={{ fontSize: 48, color: 'text.secondary', mb: 2 }} />
+            <Typography variant="h6" gutterBottom>No discussions yet</Typography>
+            <Typography variant="body1" color="text.secondary" mb={3}>
+              Be the first to start a discussion about this challenge
+            </Typography>
+            <Button 
+              variant="contained" 
+              onClick={handleOpenDialog}
+              disabled={isSubmitting}
+              startIcon={isSubmitting ? <CircularProgress size={20} /> : <Add />}
+            >
+              {isSubmitting ? 'Creating...' : 'Start a Discussion'}
+            </Button>
+          </Paper>
+        ) : (
+          <List sx={{ width: '100%', }}>
+            {conversations.map((conversation) => (
+              <React.Fragment key={conversation.id}>
+                <Link to={`/conversations/${conversation.id}`}>
+                <Card 
+                  sx={{
+                    mb: 2,
+                    textDecoration: 'none',
+                    '&:hover': {
+                      boxShadow: 3,
+                      transform: 'translateY(-2px)',
+                      transition: 'all 0.2s ease-in-out',
+                    },
+                  }}
+                  elevation={1}
+                >
+                  <CardHeader
+                    avatar={
+                      <Avatar sx={{ bgcolor: 'primary.main' }}>
+                        {conversation.user?.[0]?.toUpperCase() || '?'}
+                      </Avatar>
+                    }
+                    title={
+                      <Typography variant="subtitle1" sx={{ fontWeight: 500 }}>
+                        {conversation.topic || 'Untitled Discussion'}
+                      </Typography>
+                    }
+                    subheader={
+                      <Box display="flex" alignItems="center" gap={1} mt={0.5}>
+                        <Typography variant="caption" color="text.secondary">
+                          {conversation.user || 'Anonymous'}
+                        </Typography>
+                        <Typography variant="caption" color="text.secondary">•</Typography>
+                        <Typography variant="caption" color="text.secondary">
+                          {conversation.updated_at ? format(new Date(conversation.updated_at), 'MMM d, yyyy') : ''}
+                        </Typography>
                       </Box>
-                    ))}
-
-                    <form onSubmit={(e) => handleSubmitPost(e, conversation.id.toString())}>
-                      <TextField
-                        fullWidth
-                        multiline
-                        rows={3}
-                        variant="outlined"
-                        placeholder="Add to the discussion..."
-                        value={newPostContent}
-                        onChange={(e) => setNewPostContent(e.target.value)}
-                        disabled={isSubmitting}
-                        sx={{ mb: 1 }}
+                    }
+                    action={
+                      <Chip 
+                        label={conversation.status}
+                        size="small"
+                        color={
+                          conversation.status === 'OPEN' ? 'success' : 
+                          conversation.status === 'CLOSED' ? 'default' : 'warning'
+                        }
+                        sx={{ 
+                          textTransform: 'capitalize',
+                          mb: 1 
+                        }}
                       />
-                      <Box display="flex" justifyContent="flex-end">
-                        <Button 
-                          type="submit" 
-                          variant="contained" 
-                          disabled={!newPostContent.trim() || isSubmitting}
-                        >
-                          {isSubmitting ? 'Posting...' : 'Post'}
-                        </Button>
-                      </Box>
-                    </form>
-                  </Paper>
-                </Box>
-              ))
-            ) : (
-              <Paper variant="outlined" sx={{ p: 3, textAlign: 'center' }}>
-                <Typography variant="body1" color="text.secondary" gutterBottom>
-                  No discussions yet. Start a new one!
-                </Typography>
-                <form onSubmit={handleSubmitPost}>
-                  <TextField
-                    fullWidth
-                    multiline
-                    rows={3}
-                    variant="outlined"
-                    placeholder="Start a new discussion..."
-                    value={newPostContent}
-                    onChange={(e) => setNewPostContent(e.target.value)}
-                    disabled={isSubmitting}
-                    sx={{ mb: 2 }}
+                    }
                   />
-                  <Button 
-                    type="submit" 
-                    variant="contained" 
-                    disabled={!newPostContent.trim() || isSubmitting}
-                  >
-                    {isSubmitting ? 'Posting...' : 'Start Discussion'}
-                  </Button>
-                </form>
-              </Paper>
-            )}
-          </Box>
+                  <CardContent sx={{ pt: 1, pb: '16px !important' }}>
+                    <Typography 
+                      variant="body2" 
+                      color="text.secondary"
+                      sx={{
+                        display: '-webkit-box',
+                        WebkitLineClamp: 2,
+                        WebkitBoxOrient: 'vertical',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                      }}
+                    >
+                      {conversation.posts?.[0]?.content || 'No content'}
+                    </Typography>
+                  </CardContent>
+                  <CardActions sx={{ pt: 0, px: 2, pb: 1 }}>
+                    <Box display="flex" alignItems="center" gap={1}>
+                      <ChatBubbleOutline fontSize="small" color="action" />
+                      <Typography variant="caption" color="text.secondary">
+                        {conversation.posts?.length || 0} {conversation.posts?.length === 1 ? 'reply' : 'replies'}
+                      </Typography>
+                    </Box>
+                  </CardActions>
+                </Card>
+                </Link>
+              </React.Fragment>
+            ))}
+          </List>
         )}
       </Box>
+
+      {/* New Discussion Dialog */}
+      <Dialog 
+        open={isDialogOpen} 
+        onClose={handleCloseDialog}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle>
+          <Box display="flex" justifyContent="space-between" alignItems="center">
+            Start a New Discussion
+            <IconButton 
+              edge="end" 
+              color="inherit" 
+              onClick={handleCloseDialog}
+              aria-label="close"
+            >
+              <Close />
+            </IconButton>
+          </Box>
+        </DialogTitle>
+        <form onSubmit={handleStartNewConversation}>
+          <DialogContent dividers>
+            <FormControl fullWidth error={!!formErrors.topic} sx={{ mb: 3 }}>
+              <TextField
+                autoFocus
+                margin="dense"
+                id="topic"
+                label="Discussion Topic"
+                type="text"
+                fullWidth
+                variant="outlined"
+                value={topic}
+                onChange={(e) => setTopic(e.target.value)}
+                error={!!formErrors.topic}
+                disabled={isSubmitting}
+              />
+              {formErrors.topic && (
+                <FormHelperText>{formErrors.topic}</FormHelperText>
+              )}
+            </FormControl>
+            
+            <FormControl fullWidth error={!!formErrors.message}>
+              <TextField
+                margin="dense"
+                id="message"
+                label="Your Message"
+                type="text"
+                fullWidth
+                multiline
+                rows={6}
+                variant="outlined"
+                value={message}
+                onChange={(e) => setMessage(e.target.value)}
+                error={!!formErrors.message}
+                disabled={isSubmitting}
+              />
+              {formErrors.message && (
+                <FormHelperText>{formErrors.message}</FormHelperText>
+              )}
+            </FormControl>
+          </DialogContent>
+          <DialogActions sx={{ p: 2 }}>
+            <Button 
+              onClick={handleCloseDialog} 
+              disabled={isSubmitting}
+              color="inherit"
+            >
+              Cancel
+            </Button>
+            <Button 
+              type="submit" 
+              variant="contained" 
+              color="primary"
+              disabled={isSubmitting}
+              startIcon={isSubmitting ? <CircularProgress size={20} /> : null}
+            >
+              {isSubmitting ? 'Creating...' : 'Start Discussion'}
+            </Button>
+          </DialogActions>
+        </form>
+      </Dialog>
     </Container>
   );
 };
 
-function getDifficultyColor(difficulty: string) {
-  switch (difficulty.toLowerCase()) {
+const getDifficultyColor = (difficulty: string) => {
+  switch (difficulty?.toLowerCase()) {
     case 'beginner':
       return 'success';
     case 'intermediate':
@@ -309,4 +431,4 @@ function getDifficultyColor(difficulty: string) {
     default:
       return 'default';
   }
-}
+};

@@ -1,4 +1,4 @@
-import { Challenge, Conversation, ChallengeList, ConversationList, Post, PostList, User, PostCreate } from "./openapi/types";
+import { Challenge, Conversation, ChallengeList, ConversationList, Post, PostList, User, PostCreate, ConversationCreate } from "./openapi/types";
 
 const API_BASE_URL = 'http://localhost:8000';
 
@@ -61,15 +61,7 @@ export const apiClient = {
     return handleResponse<Conversation>(response);
   },
 
-  createConversation: async (data: {
-    topic: string;
-    category: string;
-    challenge_id?: string;
-    initial_post?: {
-      user: string;
-      content: string;
-    };
-  }): Promise<Conversation> => {
+  createConversation: async (data: ConversationCreate): Promise<Conversation> => {
     const response = await fetch(`${API_BASE_URL}/conversations`, {
       method: 'POST',
       headers: {

@@ -91,9 +91,26 @@ export interface paths {
         put?: never;
         /**
          * Create Conversation
-         * @description Create a new support conversation with an optional initial post.
+         * @description Create a new support conversation.
          */
         post: operations["create_conversation_conversations__post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/conversations/user": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List User Conversations */
+        get: operations["list_user_conversations_conversations_user_get"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -166,7 +183,11 @@ export interface paths {
         get: operations["read_post_conversations__conversation_id__posts__post_id__get"];
         put?: never;
         post?: never;
-        delete?: never;
+        /**
+         * Delete Post
+         * @description Delete a specific post from a conversation.
+         */
+        delete: operations["delete_post_conversations__conversation_id__posts__post_id__delete"];
         options?: never;
         head?: never;
         patch?: never;
@@ -310,38 +331,32 @@ export interface components {
          * @description Schema for creating a new conversation.
          */
         ConversationCreate: {
-            /** Identifier */
-            identifier: string;
             /** Challenge Id */
             challenge_id: number;
             /** Topic */
             topic: string;
             /** Category */
             category: string;
-            /** @default OPEN */
-            status: components["schemas"]["ConversationStatus"];
-            /** Assignee */
-            assignee?: string | null;
         };
         /**
          * ConversationPublic
          * @description Schema for public representation of a conversation.
          */
         ConversationPublic: {
-            /** Identifier */
-            identifier: string;
             /** Challenge Id */
             challenge_id: number;
             /** Topic */
             topic: string;
             /** Category */
             category: string;
-            /** @default OPEN */
-            status: components["schemas"]["ConversationStatus"];
-            /** Assignee */
-            assignee?: string | null;
             /** User */
             user: string;
+            /** Identifier */
+            identifier?: string | null;
+            /** @default OPEN */
+            status: components["schemas"]["ConversationStatus"] | null;
+            /** Assignee */
+            assignee?: string | null;
             /** Id */
             id: number;
             /**
@@ -419,8 +434,6 @@ export interface components {
         PostCreate: {
             /** Content */
             content: string;
-            /** Conversation Id */
-            conversation_id?: number;
         };
         /**
          * PostPublic
@@ -429,10 +442,10 @@ export interface components {
         PostPublic: {
             /** Content */
             content: string;
-            /** Conversation Id */
-            conversation_id?: number;
             /** User */
             user: string;
+            /** Conversation Id */
+            conversation_id?: number;
             /** Id */
             id: number;
             /**
@@ -444,7 +457,7 @@ export interface components {
         /** User */
         User: {
             /** User Id */
-            user_id: string;
+            user_id: number;
             /** Username */
             username: string;
             /** Email */
@@ -794,6 +807,45 @@ export interface operations {
             };
         };
     };
+    list_user_conversations_conversations_user_get: {
+        parameters: {
+            query?: {
+                offset?: number;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListResponse_ConversationPublic_"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     read_conversation_conversations__conversation_id__get: {
         parameters: {
             query?: never;
@@ -1013,6 +1065,43 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["PostPublic"];
                 };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_post_conversations__conversation_id__posts__post_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                conversation_id: number;
+                post_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Not found */
             404: {

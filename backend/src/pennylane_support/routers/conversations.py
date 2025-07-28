@@ -86,9 +86,15 @@ async def create_conversation(
     conversation: ConversationCreate,
 ):
     """Create a new support conversation."""
+
+    challenge = session.get(Challenge, conversation.challenge_id)
+    if not challenge:
+        raise HTTPException(status_code=404, detail="Challenge not found")
+    
     db_conversation = Conversation.model_validate(
-        **conversation.model_dump(), user=user.username
+        {**conversation.model_dump(), "user": user.username}
     )
+
     session.add(db_conversation)
     session.commit()
     session.refresh(db_conversation)
@@ -164,10 +170,8 @@ async def create_post(
     post: PostCreate,
 ):
     """Add a post to an existing conversation."""
-    # Verify conversation exists
     conversation = await read_conversation(session=session, conversation_id=conversation_id)
     
-    # Create the new post
     db_post = Post(
         **post.model_dump(),
         user=user.username,
@@ -175,7 +179,6 @@ async def create_post(
         timestamp=datetime.now(timezone.utc)
     )
     
-    # Update conversation's updated_at timestamp
     conversation.updated_at = datetime.now(timezone.utc)
     
     session.add(db_post)
@@ -192,10 +195,8 @@ async def list_posts(
     limit: int = Query(default=20, le=100),
 ):
     """List all posts in a conversation with pagination."""
-    # Verify conversation exists
     await read_conversation(session=session, conversation_id=conversation_id)
     
-    # Get total count for pagination
     total = session.scalar(
         select(func.count()).select_from(Post)
         .where(Post.conversation_id == conversation_id)
@@ -226,7 +227,6 @@ async def read_post(
     post_id: int,
 ):
     """Get a specific post from a conversation."""
-    # Verify conversation exists
     await read_conversation(session=session, conversation_id=conversation_id)
     
     post = session.exec(
@@ -249,7 +249,6 @@ async def delete_post(
     post_id: int,
 ):
     """Delete a specific post from a conversation."""
-    # Verify conversation exists
     await read_conversation(session=session, conversation_id=conversation_id)
     
     post = session.exec(

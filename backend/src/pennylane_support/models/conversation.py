@@ -37,16 +37,16 @@ class PostPublic(PostBase):
 
 class ConversationCreate(SQLModel):
     """Schema for creating a new conversation."""
-    identifier: str = Field(unique=True, index=True)
     challenge_id: int = Field(foreign_key="challenge.id")
     topic: str
     category: str
-    status: ConversationStatus = ConversationStatus.OPEN
-    assignee: str | None = None
 
 class ConversationBase(ConversationCreate):
     """Base schema for a conversation."""
     user: str
+    identifier: str | None = Field(unique=True, index=True, default=None)
+    status: Optional[ConversationStatus] = ConversationStatus.OPEN
+    assignee: str | None = None
 
 class Conversation(ConversationBase, table=True):
     """Database model for a conversation."""
