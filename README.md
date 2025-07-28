@@ -6,7 +6,6 @@ A support platform for PennyLane users to get help with quantum computing challe
 
 - `/backend` - FastAPI Python backend
 - `/frontend` - React TypeScript frontend
-- `/scripts` - Database and setup scripts
 
 ## Prerequisites
 
